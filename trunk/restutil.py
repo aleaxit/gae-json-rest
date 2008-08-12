@@ -1,19 +1,23 @@
 """ Utilities for REST CRUD support for GAE db models.
 
-    Specifically, this module facilitates introspection about a data model built on GAE db -- a registry of
-    what db.Model subclasses are made available for introspection and by what names, utilities to register
-    and query about such classes 'in bulk', mapping of property values of instances of those classes from
-    and to strings.  Reference properties, in particular, are mapped to strings of the form
-      Classname/<id>
-    where id is a unique-within-class id usable for the get_by_id method of the corresponding class;
-    "reverse-reference" properties are *not* supported for conversion to/from string.
+   Specifically, this module facilitates introspection about a data model built
+   on GAE db -- a registry of what db.Model subclasses are made available for
+   introspection and by what names, utilities to register and query about such
+   classes 'in bulk', mapping of property values of instances of those classes
+   from and to strings.  Reference properties, in particular, are mapped to
+   strings of the form Classname/<id> where id is a unique-within-class id
+   usable for the get_by_id method of the corresponding class;
+   "reverse-reference" properties are *not* supported for conversion to/from
+   string.
+ 
+   The conversion of property values to/from string is made by static methods
+   named foo_to_string and foo_from_string (for a property class attribute
+   named foo); this module offers facilities to make and install on the class
+   object all such needed methods, but if the class itself explicitly chooses
+   to define some methods with these names, those facilities will not override
+   them (so each db.Model subclass gets a chance to special-case some or all
+   of its instance's property attributes). The_from_string method is not  
 
-    The conversion of property values to/from string is made by static methods named foo_to_string and 
-    foo_from_string (for a property class attribute named foo); this module offers facilities to make
-    and install on the class object all such needed methods, but if the class itself explicitly chooses
-    to define some methods with these names, those facilities will not override them (so each db.Model
-    subclass gets a chance to special-case some or all of its instance's property attributes).  The
-    _from_string method is not 
 """
 import datetime
 import inspect

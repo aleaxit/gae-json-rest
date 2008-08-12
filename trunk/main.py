@@ -21,7 +21,7 @@ class CrudRestHandler(webapp.RequestHandler):
       return self._serve([jsonutil.id_of(x) for x in cls.all()])
     numid = int(strid)
     instance = cls.get_by_id(numid)
-    json_dict = jsonutil.make_json_dict(cls, instance)
+    json_dict = jsonutil.make_json_dict(instance)
     return self._serve(json_dict)
 
 
