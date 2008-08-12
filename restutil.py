@@ -12,7 +12,8 @@
     foo_from_string (for a property class attribute named foo); this module offers facilities to make
     and install on the class object all such needed methods, but if the class itself explicitly chooses
     to define some methods with these names, those facilities will not override them (so each db.Model
-    subclass gets a chance to special-case some or all of its instance's property attributes).
+    subclass gets a chance to special-case some or all of its instance's property attributes).  The
+    _from_string method is not 
 """
 import datetime
 import inspect
@@ -26,6 +27,8 @@ from google.appengine.api import users
 def id_of(x):
   """ Get the numeric ID given an instance x of a db.Model subclass. """
   return x.key().id()
+
+def identity(x): return x
 
 def isProperty(x):
   """ Is class attribute x a 'real' property (not a reverse reference)?
@@ -183,13 +186,13 @@ def addHelperMethods(cls):
   props = allProperties(cls)
   for name, value in props:
     fs_name = name + '_from_string'
-    ts_name = name + '_to_string'
     if not hasattr(cls, fs_name):
-      setter = setter_registry.get(type(value))
-      if setter is not None: setattr(cls, fs_name, setter)
+      setter = setter_registry.get(type(value), identity)
+      setattr(cls, fs_name, setter)
+    ts_name = name + '_to_string'
     if not hasattr(cls, ts_name):
-      getter = getter_registry.get(type(value))
-      if getter is not None: setattr(cls, ts_name, getter)
+      getter = getter_registry.get(type(value), str)
+      setattr(cls, ts_name, getter)
 
 def decorateModuleNamed(module_name):
   """ Do all needed work for non-private model classes in module thus named. """
