@@ -1,4 +1,16 @@
 """ Utilities for JSON REST CRUD support for GAE db models.
+
+Terminology: a subclass of db.Model is known as "a Model"; an instance of
+such a subclass is known as "an entity".
+
+Data is said to be in JSONed or JSONable form if it contains only dicts, lists
+and scalars (strings, numbers) in a form that is correctly serializable into a
+JSON-format string.
+
+In particular, a "Jobj" is a JSONed dict with a key 'id' mapping the string
+format of the numeric value of an entity; each other key must be the name of
+a property of that entity's Model, and the corresponding value must be a string
+that can be deserialized into a value of that property's type.
 """
 import re
 
@@ -6,15 +18,15 @@ import restutil
 from django.utils import simplejson
 
 
-def id_of(x):
-  """ Make a {'id':<num>} dict for model instance x.
+def id_of(entity):
+  """ Make a {'id': <string-of-digits>} dict for an entity.
 
   Args:
-    x: an instance of some db.Model subclass
+    entity: an entity
   Returns:
-    a dict with key 'id' mapped to the string form of x's id
+    a Jobj corresponding to the entity
   """
-  return dict(id=restutil.id_of(x))
+  return dict(id=restutil.id_of(entity))
 
 
 # RE to match: optional /, classname, optional /, ID of 0+ numeric digits
@@ -27,26 +39,26 @@ def path_to_classname_and_id(path):
     path: a path string to anaylyze
   Returns:
     a 2-item tuple:
-      (None, '')        if path does not match or classname lookup fails
-      (class, idstring) if match and classname lookup are successful
-                        idstring may be '', or else a string of digits
+      (None, '')            if the path does not match CLASSNAME_ID_RE
+      (classname, idstring) if the path does match
+                            [idstring may be '', or else a string of digits]
   """
   mo = CLASSNAME_ID_RE.match(path)
   if mo: return mo.groups()
   else: return (None, '')
 
 
-def send_json(response_obj, data):
+def send_json(response_obj, jdata):
   """ Send data in JSON form to an HTTP-response object.
 
   Args:
     response_obj: an HTTP response object
-    data: a dict or list in correct 'JSONable' form
+    jdata: a dict or list in correct 'JSONable' form
   Side effects:
-    sends the JSON form of data on response.out
+    sends the JSON form of jdata on response.out
   """
   response.content_type = 'application/json'
-  simplejson.dump(data, response.out)
+  simplejson.dump(jdata, response.out)
 
 
 def receive_json(request_obj):
@@ -60,76 +72,77 @@ def receive_json(request_obj):
   return simplejson.loads(self.request.body)
 
 
-def make_json_dict(instance):
-  """ Make a JSONable dict given an instance of a db.Model subclass.
+def make_json_dict(entity):
+  """ Make a JSONable dict (a Jobj) given an entity.
 
   Args:
-    instance: an instance of a db.Model subclass
+    entity: an entity
   Returns:
-    the JSONable-form dict for that instance
+    the JSONable-form dict (Jobj) for the entity
   """
-  result = id_of(x)
-  props = restutil.allProperties(type(instance))
+  model = type(entity)
+  jobj = id_of(entity)
+  props = restutil.allProperties(model)
   for property_name, property_value in props:
-    instance_value = getattr(instance, property_name, None)
+    instance_value = getattr(entity, property_name, None)
     if instance_value is not None:
-      to_string = getattr(aclass, property_name + '_to_string')
-      result[property_name] = to_string(instance_value)
-  return result
+      to_string = getattr(model, property_name + '_to_string')
+      jobj[property_name] = to_string(instance_value)
+  return jobj
 
 
-def parse_json_dict(cls, json_dict):
-  """ Make dict for calling cls given a db.Model subclass and a JSONed dict.
+def parse_json_dict(model, jobj):
+  """ Make dict suitable for instantiating model, given a Jobj.
 
   Args:
-    cls: a db.Model subclass
-    json_dict: a JSONable-form dict
+    model: a Model
+    jobj: a Jobj
   Returns:
-    a dict d such that calling cls(**d) instantiates cls properly
+    a dict d such that calling model(**d) properly makes an entity
   """
   result = dict()
-  for property_name, property_value in json_dict.iteritems():
+  for property_name, property_value in jobj.iteritems():
     # ensure we have an ASCII string, not a Unicode one
     property_name = str(property_name)
-    from_string = getattr(cls, property_name + '_from_string')
+    from_string = getattr(model, property_name + '_from_string')
     property_value = from_string(property_value)
     if property_value is not None:
       result[property_name] = property_value
   return result
 
 
-def make_instance(cls, json_dict):
-  """ Make instance of cls with properties as per JSONed dict json_dict.
+def make_instance(model, jobj):
+  """ Makes an entity whose type is model with the state given by jobj.
 
   Args:
-    cls: a db.Model subclass
-    json_dict: a JSONable-form dict
+    model: a Model
+    jobj: a Jobj
   Side effects:
-    creates and puts an instance x of cls with properties per json_dict
+    creates and puts an entity of type model, w/state per jobj
   Returns:
-    a JSONable-form dict to represent the newly created instance x
+    a Jobj representing the newly created entity
   """
-  instance_dict = parse_json_dict(cls, json_dict)
-  instance = cls(**instance_dict)
-  instance.put()
-  json_dict = make_json_dict(instance)
-  json_dict.update(id_of(instance))
-  return json_dict
+  entity_dict = parse_json_dict(model, jobj)
+  entity = model(**instance_dict)
+  entity.put()
+  jobj = make_json_dict(entity)
+  jobj.update(id_of(entity))
+  return jobj
 
 
-def update_instance(instance, json_dict):
-  """ Update a db.Model subclass instance given a JSONed dict of properties.
+def update_instance(entity, jobj):
+  """ Updates an entity's state as per properties given in jobj.
 
   Args:
-    instance: an instance of a db.Model subclass
-    json_dict: a JSONed dict for properties applicable to instance
+    entity: an entity
+    jobj: a jobj
   Side effects:
-    updates instance with properties as given by json_dict
+    updates the entity with properties as given by jobj
   Returns:
-    a JSONable-form dict to represent the whole new state of the instance
+    a Jobj representing the whole new state of the entity
   """
-  new_instance_data = parse_json_dict(type(instance), json_data)
-  for property_name, property_value in new_instance_data.iteritems():
-    setattr(instance, property_name, property_value)
-  instance.put()
-  return make_json_dict(instance)
+  new_entity_data = parse_json_dict(type(instance), json_data)
+  for property_name, property_value in new_entity_data.iteritems():
+    setattr(entity, property_name, property_value)
+  entity.put()
+  return make_json_dict(entity)
