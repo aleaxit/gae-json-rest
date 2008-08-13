@@ -57,8 +57,8 @@ def send_json(response_obj, jdata):
   Side effects:
     sends the JSON form of jdata on response.out
   """
-  response.content_type = 'application/json'
-  simplejson.dump(jdata, response.out)
+  response_obj.content_type = 'application/json'
+  simplejson.dump(jdata, response_obj.out)
 
 
 def receive_json(request_obj):
@@ -69,10 +69,10 @@ def receive_json(request_obj):
   Returns:
     the JSONable-form result of loading the request's body
   """
-  return simplejson.loads(self.request.body)
+  return simplejson.loads(request_obj.body)
 
 
-def make_json_dict(entity):
+def make_jobi(entity):
   """ Make a JSONable dict (a Jobj) given an entity.
 
   Args:
@@ -84,14 +84,14 @@ def make_json_dict(entity):
   jobj = id_of(entity)
   props = restutil.allProperties(model)
   for property_name, property_value in props:
-    instance_value = getattr(entity, property_name, None)
-    if instance_value is not None:
+    value_in_entity = getattr(entity, property_name, None)
+    if value_in_entity is not None:
       to_string = getattr(model, property_name + '_to_string')
-      jobj[property_name] = to_string(instance_value)
+      jobj[property_name] = to_string(value_in_entity)
   return jobj
 
 
-def parse_json_dict(model, jobj):
+def parse_jobi(model, jobj):
   """ Make dict suitable for instantiating model, given a Jobj.
 
   Args:
@@ -111,7 +111,7 @@ def parse_json_dict(model, jobj):
   return result
 
 
-def make_instance(model, jobj):
+def make_entity(model, jobj):
   """ Makes an entity whose type is model with the state given by jobj.
 
   Args:
@@ -122,15 +122,15 @@ def make_instance(model, jobj):
   Returns:
     a Jobj representing the newly created entity
   """
-  entity_dict = parse_json_dict(model, jobj)
-  entity = model(**instance_dict)
+  entity_dict = parse_jobi(model, jobj)
+  entity = model(**entity_dict)
   entity.put()
-  jobj = make_json_dict(entity)
+  jobj = make_jobi(entity)
   jobj.update(id_of(entity))
   return jobj
 
 
-def update_instance(entity, jobj):
+def update_entity(entity, jobj):
   """ Updates an entity's state as per properties given in jobj.
 
   Args:
@@ -141,8 +141,8 @@ def update_instance(entity, jobj):
   Returns:
     a Jobj representing the whole new state of the entity
   """
-  new_entity_data = parse_json_dict(type(instance), json_data)
+  new_entity_data = parse_jobi(type(entity), json_data)
   for property_name, property_value in new_entity_data.iteritems():
     setattr(entity, property_name, property_value)
   entity.put()
-  return make_json_dict(entity)
+  return make_jobi(entity)

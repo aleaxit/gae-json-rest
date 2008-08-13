@@ -33,6 +33,7 @@ def id_of(x):
   return x.key().id()
 
 def identity(x): return x
+identity = staticmethod(identity)
 
 def isProperty(x):
   """ Is class attribute x a 'real' property (not a reverse reference)?
