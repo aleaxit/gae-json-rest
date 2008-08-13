@@ -59,6 +59,30 @@ class CrudRestHandler(webapp.RequestHandler):
     self.response.headers['Location'] = new_entity_path
     self.response.set_status(201, 'Created entity %s' % new_entity_path)
 
+    def put(self):
+      """ Update an entity of model given by path /classname/id.
+      
+          Request body is JSON for a jobj for an existing entity.
+          Response is some success code?
+      """
+      classname, strid = jsonutil.path_to_classname_and_id(self.request.path)
+      if not strid:
+        self.response.set_status(400, 'Cannot update entity without fixed ID.')
+        return
+      if not classname:
+        self.response.set_status(400, 'Cannot update entity without model.')
+        return
+      model = restutil.modelClassFromName(classname)
+      if model is None:
+        self.response.set_status(400, 'Model %r not found' % classname)
+        return
+      jobj = jsonutil.receive_json(self.request)
+      jobj = jsonutil.update_entity(model, jobj)
+      self._serve(jobj)
+      updated_entity_path = "/%s/%s" % (classname, jobj['id'])
+      self.response.headers['Location'] = updated_entity_path
+      self.response.set_status(201, 'Updated entity %s' % updated_entity_path)
+
 
 def main():
   application = webapp.WSGIApplication([('/.*', CrudRestHandler)],
