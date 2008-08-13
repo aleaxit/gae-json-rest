@@ -5,7 +5,7 @@ import jsonutil
 import restutil
 
 
-# TODO: put, delete, queries, and MUCH better error-handling!-)
+# TODO: delete, queries, and MUCH better error-handling!-)
 
 class CrudRestHandler(webapp.RequestHandler):
 
@@ -63,7 +63,7 @@ class CrudRestHandler(webapp.RequestHandler):
       """ Update an entity of model given by path /classname/id.
       
           Request body is JSON for a jobj for an existing entity.
-          Response is some success code?
+          Response is JSON for a jobj for the updated entity.
       """
       classname, strid = jsonutil.path_to_classname_and_id(self.request.path)
       if not strid:
@@ -80,8 +80,7 @@ class CrudRestHandler(webapp.RequestHandler):
       jobj = jsonutil.update_entity(model, jobj)
       self._serve(jobj)
       updated_entity_path = "/%s/%s" % (classname, jobj['id'])
-      self.response.headers['Location'] = updated_entity_path
-      self.response.set_status(201, 'Updated entity %s' % updated_entity_path)
+      self.response.set_status(200, 'Updated entity %s' % updated_entity_path)
 
 
 def main():
