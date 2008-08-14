@@ -188,19 +188,19 @@ def addHelperMethods(cls):
       Args:
         cls: a class object (db.Model subclass), adds methods to it.
   """
-  logging.info('decorating %r', cls)
+  logging.info('decorating model %r', cls)
   props = allProperties(cls)
   for name, value in props:
     fs_name = name + '_from_string'
     if not hasattr(cls, fs_name):
       setter = setter_registry.get(type(value), identity)
       setattr(cls, fs_name, setter)
-      logging.info('added %r: %r', fs_name, setter)
+      # logging.info('added %r: %r', fs_name, setter)
     ts_name = name + '_to_string'
     if not hasattr(cls, ts_name):
       getter = getter_registry.get(type(value), str)
       setattr(cls, ts_name, getter)
-      logging.info('added %r: %r', ts_name, getter)
+      # logging.info('added %r: %r', ts_name, getter)
 
 def decorateModuleNamed(module_name):
   """ Do all needed work for non-private model classes in module thus named. """

@@ -1,3 +1,6 @@
+"""A toy-level example of a RESTful app running on Google Appengine.
+"""
+import logging
 import time
 
 import wsgiref.handlers
@@ -13,11 +16,6 @@ import restutil
 class CrudRestHandler(cookutil.CookieHandler):
 
   def _serve(self, data):
-    if isinstance(data, list):
-      # data.insert(0, 'cook %s' % self.response.headers['Set-Cookie'])
-      pass
-    elif isinstance(data, dict):
-      data['cook'] = str(self.response.headers['Set-Cookie'])
     return jsonutil.send_json(self.response, data)
 
   def get(self):
@@ -68,6 +66,7 @@ class CrudRestHandler(cookutil.CookieHandler):
     jobj = jsonutil.make_entity(model, jobj)
     self._serve(jobj)
     new_entity_path = "/%s/%s" % (classname, jobj['id'])
+    logging.info('Post created %r', new_entity_path)
     self.response.headers['Location'] = new_entity_path
     self.response.set_status(201, 'Created entity %s' % new_entity_path)
 

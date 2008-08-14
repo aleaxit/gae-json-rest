@@ -23,14 +23,37 @@ def doTemplateTest(conn):
   # form name based on unique number
   docname = 'Dr. John %s' % unique
   # make entity with that name
-  body = testutil.body(name=docname)
-  testutil.request_and_show(conn, 'POST', '/Doctor/', body)
-  print 'IDs of Doctors after:'
+  post_body = testutil.body(name=docname)
+  post_result = testutil.request_and_show(conn, 'POST', '/Doctor/', post_body)
+  new_doctor_id = post_result['id']
+  new_doctor_path = '/Doctor/%s' % new_doctor_id
+  print 'Created %r' % new_doctor_path
+  # show new doctor just created
+  print 'New Doctor just created:'
+  testutil.request_and_show(conn, 'GET', new_doctor_path)
+  # show IDs after the POST
+  print 'IDs of Doctors after POST:'
   testutil.request_and_show(conn, 'GET', '/Doctor/')
 
-  testutil.request_and_show(conn, 'PUT', '/Doctor/1', body)
-  print 'IDs of Doctors after:'
+  # Now change the name of the doctor
+  docname = '%s changed' % docname
+  put_body = testutil.body(name=docname)
+  testutil.request_and_show(conn, 'PUT', new_doctor_path, put_body)
+  # show new doctor just changed
+  print 'New Doctor just changed:'
+  testutil.request_and_show(conn, 'GET', new_doctor_path)
+  print 'IDs of Doctors after PUT:'
   testutil.request_and_show(conn, 'GET', '/Doctor/')
+
+  # check idempotence of PUT
+  print 'Check PUT idempotence'
+  testutil.request_and_show(conn, 'PUT', new_doctor_path, put_body)
+  # show new doctor just not-changed
+  print 'New Doctor just not-changed:'
+  testutil.request_and_show(conn, 'GET', new_doctor_path)
+  print 'IDs of Doctors after second PUT:'
+  testutil.request_and_show(conn, 'GET', '/Doctor/')
+
 
 
 testutil.main(doTemplateTest)

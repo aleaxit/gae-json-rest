@@ -27,4 +27,6 @@ class Pager(db.Model):
   name = db.StringProperty()
   doctor = db.ReferenceProperty(Doctor)
 
+
 restutil.decorateModuleNamed(__name__)
+logging.info('Models in %r decorated', __name__)
