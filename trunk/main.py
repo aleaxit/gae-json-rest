@@ -34,7 +34,7 @@ class CrudRestHandler(cookutil.CookieHandler):
     self.set_cookie('ts', str(time.time()))
     classname, strid = jsonutil.path_to_classname_and_id(self.request.path)
     if not classname:
-        return self._serve(restutil.allModelClassNames())
+      return self._serve(restutil.allModelClassNames())
     model = restutil.modelClassFromName(classname)
     if model is None:
       self.response.set_status(400, 'Model %r not found' % classname)
@@ -55,15 +55,15 @@ class CrudRestHandler(cookutil.CookieHandler):
     """
     classname, strid = jsonutil.path_to_classname_and_id(self.request.path)
     if strid:
-        self.response.set_status(400, 'Cannot create entity with fixed ID.')
-        return
+      self.response.set_status(400, 'Cannot create entity with fixed ID.')
+      return
     if not classname:
-        self.response.set_status(400, 'Cannot create entity without model.')
-        return
+      self.response.set_status(400, 'Cannot create entity without model.')
+      return
     model = restutil.modelClassFromName(classname)
     if model is None:
-        self.response.set_status(400, 'Model %r not found' % classname)
-        return
+      self.response.set_status(400, 'Model %r not found' % classname)
+      return
     jobj = jsonutil.receive_json(self.request)
     jobj = jsonutil.make_entity(model, jobj)
     self._serve(jobj)
@@ -71,33 +71,33 @@ class CrudRestHandler(cookutil.CookieHandler):
     self.response.headers['Location'] = new_entity_path
     self.response.set_status(201, 'Created entity %s' % new_entity_path)
 
-    def put(self):
-      """ Update an entity of model given by path /classname/id.
-      
-          Request body is JSON for a jobj for an existing entity.
-          Response is JSON for a jobj for the updated entity.
-      """
-      classname, strid = jsonutil.path_to_classname_and_id(self.request.path)
-      if not strid:
-        self.response.set_status(400, 'Cannot update entity without fixed ID.')
-        return
-      if not classname:
-        self.response.set_status(400, 'Cannot update entity without model.')
-        return
-      model = restutil.modelClassFromName(classname)
-      if model is None:
-        self.response.set_status(400, 'Model %r not found' % classname)
-        return
-      jobj = jsonutil.receive_json(self.request)
-      jobj = jsonutil.update_entity(model, jobj)
-      self._serve(jobj)
-      updated_entity_path = "/%s/%s" % (classname, jobj['id'])
-      self.response.set_status(200, 'Updated entity %s' % updated_entity_path)
+  def put(self):
+    """ Update an entity of model given by path /classname/id.
+
+        Request body is JSON for a jobj for an existing entity.
+        Response is JSON for a jobj for the updated entity.
+    """
+    classname, strid = jsonutil.path_to_classname_and_id(self.request.path)
+    if not strid:
+      self.response.set_status(400, 'Cannot update entity without fixed ID.')
+      return
+    if not classname:
+      self.response.set_status(400, 'Cannot update entity without model.')
+      return
+    model = restutil.modelClassFromName(classname)
+    if model is None:
+      self.response.set_status(400, 'Model %r not found' % classname)
+      return
+    jobj = jsonutil.receive_json(self.request)
+    jobj = jsonutil.update_entity(model, jobj)
+    self._serve(jobj)
+    updated_entity_path = "/%s/%s" % (classname, jobj['id'])
+    self.response.set_status(200, 'Updated entity %s' % updated_entity_path)
 
 
 def main():
   application = webapp.WSGIApplication([('/.*', CrudRestHandler)],
-                                       debug=True)
+      debug=True)
   wsgiref.handlers.CGIHandler().run(application)
 
 if __name__ == '__main__':
