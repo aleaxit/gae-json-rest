@@ -1,15 +1,23 @@
+import time
+
 import wsgiref.handlers
 from google.appengine.ext import webapp
 import models
+import cookutil
 import jsonutil
 import restutil
 
 
 # TODO: delete, queries, and MUCH better error-handling!-)
 
-class CrudRestHandler(webapp.RequestHandler):
+class CrudRestHandler(cookutil.CookieHandler):
 
   def _serve(self, data):
+    if isinstance(data, list):
+      # data.insert(0, 'cook %s' % self.response.headers['Set-Cookie'])
+      pass
+    elif isinstance(data, dict):
+      data['cook'] = str(self.response.headers['Set-Cookie'])
     return jsonutil.send_json(self.response, data)
 
   def get(self):
@@ -20,15 +28,19 @@ class CrudRestHandler(webapp.RequestHandler):
     - for a path of /classname, a list of id-only jobjs for that model
     - for a path of /, a list of all model classnames
     """
+    coon = self.request.cookies.get('count', '0')
+    coon = str(1 + int(coon))
+    self.set_cookie('count', coon)
+    self.set_cookie('ts', str(time.time()))
     classname, strid = jsonutil.path_to_classname_and_id(self.request.path)
     if not classname:
         return self._serve(restutil.allModelClassNames())
     model = restutil.modelClassFromName(classname)
     if model is None:
-        self.response.set_status(400, 'Model %r not found' % classname)
-        return
+      self.response.set_status(400, 'Model %r not found' % classname)
+      return
     if not strid:
-        return self._serve([jsonutil.id_of(x) for x in model.all()])
+      return self._serve([jsonutil.id_of(x) for x in model.all()])
     numid = int(strid)
     entity = model.get_by_id(numid)
     jobj = jsonutil.make_jobj(entity)
