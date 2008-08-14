@@ -28,5 +28,9 @@ def doTemplateTest(conn):
     print 'IDs of Doctors after:'
     testutil.request_and_show(conn, 'GET', '/Doctor/')
 
+    testutil.request_and_show(conn, 'PUT', '/Doctor/1', body)
+    print 'IDs of Doctors after:'
+    testutil.request_and_show(conn, 'GET', '/Doctor/')
+
 
 testutil.main(doTemplateTest)
