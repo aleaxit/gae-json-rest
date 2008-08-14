@@ -88,8 +88,10 @@ class CrudRestHandler(cookutil.CookieHandler):
     if model is None:
       self.response.set_status(400, 'Model %r not found' % classname)
       return
+    numid = int(strid)
+    entity = model.get_by_id(numid)
     jobj = jsonutil.receive_json(self.request)
-    jobj = jsonutil.update_entity(model, jobj)
+    jobj = jsonutil.update_entity(entity, jobj)
     self._serve(jobj)
     updated_entity_path = "/%s/%s" % (classname, jobj['id'])
     self.response.set_status(200, 'Updated entity %s' % updated_entity_path)

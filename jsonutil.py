@@ -141,7 +141,7 @@ def update_entity(entity, jobj):
   Returns:
     a Jobj representing the whole new state of the entity
   """
-  new_entity_data = parse_jobi(type(entity), json_data)
+  new_entity_data = parse_jobi(type(entity), jobj)
   for property_name, property_value in new_entity_data.iteritems():
     setattr(entity, property_name, property_value)
   entity.put()
