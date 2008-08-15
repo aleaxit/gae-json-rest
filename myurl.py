@@ -20,5 +20,6 @@ def resolve(path):
     if m: return m
   return ('', (), {})
 
-resolve('hello/123')
-resolve('')
+if __name__ == '__main__':
+  resolve('hello/123')
+  resolve('')
