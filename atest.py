@@ -13,13 +13,21 @@ def doTemplateTest(conn):
     raise
 
   # do we know any Doctors?
-  print 'IDs of Doctors before:'
+  print 'IDs of Doctors before any operations:'
   doctorids = testutil.request_and_show(conn, 'GET', '/Doctor/')
   # get the highest-known Doctor ID, if any, to ensure a unique number
   if doctorids:
     unique = max(int(obj['id']) for obj in doctorids) + 1
   else:
     unique = 1
+  # now, we want to delete about half the doctors we know
+  for i in range(0, len(doctorids), 2):
+    strid = doctorids[i]['id']
+    testutil.silent_request(conn, 'DELETE', '/Doctor/%s' % strid)
+  print 'IDs of Doctors after some deletions:'
+  doctorids = testutil.silent_request(conn, 'GET', '/Doctor/')
+  print doctorids
+
   # form name based on unique number
   docname = 'Dr. John %s' % unique
   # make entity with that name
