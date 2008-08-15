@@ -1,22 +1,24 @@
 import django.conf.urls.defaults as d
-import pprint
+import pprint as pp
+import logging
 
-def index():
+def index(*args, **kwargs):
   print 'Inside index'
 
-def hello():
-  print 'Inside hello'
-
+def hello(*args, **kwargs):
+  pp.pprint(*args)
+  pp.pprint(kwargs)
 
 urlpatterns = d.patterns('',
     (r'^$', index),
-    (r'^hello/', hello),
+    (r'^hello/(\d+)$', hello),
     )
 
-pprint.pprint(urlpatterns)
+def resolve(path):
+  for pattern in urlpatterns:
+    m = pattern.resolve(path)
+    if m: return m
+  return ('', (), {})
 
-for pattern in urlpatterns:
-  m = pattern.resolve('hello/')
-  if m:
-    pprint.pprint(m)
-    m[0]()
+resolve('hello/123')
+resolve('')
