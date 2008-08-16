@@ -1,21 +1,35 @@
-import django.conf.urls.defaults as d
-import pprint as pp
 import logging
 import re
 
-class URLHandlerMixin(object):
-  """ This class is designed to be mixed in with a WSGI app request handler.
+class URLHandler(object):
+  """ This class can invoke a method depending on what URL was requested.
       
-      register_patterns should be called with the appropriate regexes that 
-      need to handled by the particular handler this class is mixed-in with.
+      Call register_patterns from the constructor with appropriate 
+      (regex, callback) args that need to be handled by the particular handler.
   """
   
-  def register_patterns(*args):
-    self.patterns = d.patterns(*args)
-  
-  def resolve(self, re, path):
-    for pattern in patterns:
-      m = pattern.resolve(path)
-      if m:
-        return m
-      return None
+  def __init__(self, prefix, *args):
+    """ Takes a prefix to be ignored and a list of (regex, callback) args.
+    """
+    self.callbacks = dict()
+    for arg in args:
+      self.callbacks[re.compile(r'%s%s' % (prefix, arg[0]))] = arg[1]
+
+  def process(self, path):
+    """ Match the path to one of the regexs and call the appropriate callback.
+    """
+    for r in self.callbacks.keys():
+      mo = r.match(path)
+      if mo:
+        self.callbacks[r]()
+
+
+if __name__ == '__main__':
+  def index():
+    print "inside index"
+
+  def hello():
+    print "inside hello"
+
+  handler = URLHandler('', ('/', index), ('/hello', hello))
+  handler.process('/hello')
