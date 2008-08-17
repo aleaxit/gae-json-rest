@@ -26,6 +26,9 @@ def _serialize_cookie_date(dt):
 
 class CookieHandler(webapp.RequestHandler):
 
+  def get_cookie(self, key, default_value=None):
+    return self.request.cookies.get(key, default_value)
+
   def set_cookie(self, key, value='', max_age=None,
        path='/', domain=None, secure=None, httponly=False,
        version=None, comment=None, expires=None):
