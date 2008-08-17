@@ -43,7 +43,7 @@ def request_and_show(conn, verb, path, verbose, body=None):
     print 'Cannot request %r %r: %s' % (verb, path, e)
     sys.exit(1)
   rl = conn.getresponse()
-  if verbose:
+  if verbose or rl.status//100 != 2:
     print '%s %s gave: %s %r' % (verb, path, rl.status, rl.reason)
   if rl.status//100 == 2:
     if verbose:
