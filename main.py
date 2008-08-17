@@ -95,6 +95,27 @@ class CrudRestHandler(cookutil.CookieHandler):
     updated_entity_path = "/%s/%s" % (classname, jobj['id'])
     self.response.set_status(200, 'Updated entity %s' % updated_entity_path)
 
+  def delete(self):
+    """ Delete an entity of model given by path /classname/id.
+
+        Response is JSON for an empty jobj.
+    """
+    classname, strid = jsonutil.path_to_classname_and_id(self.request.path)
+    if not strid:
+      self.response.set_status(400, 'Cannot update entity without fixed ID.')
+      return
+    if not classname:
+      self.response.set_status(400, 'Cannot update entity without model.')
+      return
+    model = restutil.modelClassFromName(classname)
+    if model is None:
+      self.response.set_status(400, 'Model %r not found' % classname)
+      return
+    numid = int(strid)
+    entity = model.get_by_id(numid)
+    entity.delete()
+    self._serve({})
+
 
 def main():
   application = webapp.WSGIApplication([('/.*', CrudRestHandler)],
