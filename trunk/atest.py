@@ -1,11 +1,12 @@
 """ A very simple "smoke test" for gae-json-rest toy app. """
+import sys
 import simplejson
 import testutil
 
-def doTemplateTest(conn):
+def doTemplateTest(conn, verbose):
   # what models do we have? shd be Doctor and Pager
-  print 'Getting names for Models:'
-  modelnames = testutil.request_and_show(conn, 'GET', '/')
+  if verbose: print 'Getting names for Models:'
+  modelnames = testutil.request_and_show(conn, 'GET', '/', verbose)
   try:
     assert set(modelnames) == set(('Doctor', 'Pager'))
   except:
@@ -13,55 +14,90 @@ def doTemplateTest(conn):
     raise
 
   # do we know any Doctors?
-  print 'IDs of Doctors before any operations:'
-  doctorids = testutil.request_and_show(conn, 'GET', '/Doctor/')
+  if verbose: print 'IDs of Doctors before any operations:'
+  doctorids = testutil.request_and_show(conn, 'GET', '/Doctor/', verbose)
   # get the highest-known Doctor ID, if any, to ensure a unique number
   if doctorids:
     unique = max(int(obj['id']) for obj in doctorids) + 1
   else:
     unique = 1
   # now, we want to delete about half the doctors we know
-  for i in range(0, len(doctorids), 2):
+  num_doctors = len(doctorids)
+  deletions = 0
+  for i in range(0, num_doctors, 2):
     strid = doctorids[i]['id']
     testutil.silent_request(conn, 'DELETE', '/Doctor/%s' % strid)
-  print 'IDs of Doctors after some deletions:'
+    deletions += 1
+  if verbose: print 'IDs of Doctors after some deletions:'
   doctorids = testutil.silent_request(conn, 'GET', '/Doctor/')
-  print doctorids
+  if verbose: print doctorids
+  if len(doctorids) != num_doctors - deletions:
+    print 'Had %d doctors, deleted %d, should have %d but have %d' % (
+        num_doctors, deletions, num_doctors-deletions, len(doctorids))
+    sys.exit(1)
+  num_doctors = len(doctorids)
 
   # form name based on unique number
   docname = 'Dr. John %s' % unique
   # make entity with that name
   post_body = testutil.body(name=docname)
-  post_result = testutil.request_and_show(conn, 'POST', '/Doctor/', post_body)
+  post_result = testutil.request_and_show(conn, 'POST', '/Doctor/', verbose,
+      post_body)
   new_doctor_id = post_result['id']
   new_doctor_path = '/Doctor/%s' % new_doctor_id
-  print 'Created %r' % new_doctor_path
+  if verbose: print 'Created %r' % new_doctor_path
   # show new doctor just created
-  print 'New Doctor just created:'
-  testutil.request_and_show(conn, 'GET', new_doctor_path)
+  if verbose: print 'New Doctor just created:'
+  new_doctor = testutil.request_and_show(conn, 'GET', new_doctor_path, verbose)
+  if new_doctor['name'] != docname:
+    print 'New doctor name should be %r, is %r instead after POST' % (
+        docname, new_doctor['name'])
+    sys.exit(1)
   # show IDs after the POST
-  print 'IDs of Doctors after POST:'
-  testutil.request_and_show(conn, 'GET', '/Doctor/')
+  if verbose: print 'IDs of Doctors after POST:'
+  doctorids = testutil.request_and_show(conn, 'GET', '/Doctor/', verbose)
+  if len(doctorids) != num_doctors + 1:
+    print 'Had %d doctors, created %d, should have %d but have %d' % (
+        num_doctors, 1, num_doctors+1, len(doctorids))
+    sys.exit(1)
+  num_doctors = len(doctorids)
 
   # Now change the name of the doctor
   docname = '%s changed' % docname
   put_body = testutil.body(name=docname)
-  testutil.request_and_show(conn, 'PUT', new_doctor_path, put_body)
+  put_result = testutil.request_and_show(conn, 'PUT', new_doctor_path, verbose,
+      put_body)
   # show new doctor just changed
-  print 'New Doctor just changed:'
-  testutil.request_and_show(conn, 'GET', new_doctor_path)
-  print 'IDs of Doctors after PUT:'
-  testutil.request_and_show(conn, 'GET', '/Doctor/')
+  if verbose: print 'New Doctor just changed:'
+  new_doctor = testutil.request_and_show(conn, 'GET', new_doctor_path, verbose)
+  if new_doctor['name'] != docname:
+    print 'New doctor name should be %r, is %r instead after PUT' % (
+        docname, new_doctor['name'])
+    sys.exit(1)
+  if verbose: print 'IDs of Doctors after PUT:'
+  doctorids = testutil.request_and_show(conn, 'GET', '/Doctor/', verbose)
+  if len(doctorids) != num_doctors:
+    print 'Had %d doctors, put %d, should have %d but have %d' % (
+        num_doctors, 1, num_doctors, len(doctorids))
+    sys.exit(1)
 
   # check idempotence of PUT
-  print 'Check PUT idempotence'
-  testutil.request_and_show(conn, 'PUT', new_doctor_path, put_body)
+  if verbose: print 'Check PUT idempotence'
+  testutil.request_and_show(conn, 'PUT', new_doctor_path, verbose, put_body)
   # show new doctor just not-changed
-  print 'New Doctor just not-changed:'
-  testutil.request_and_show(conn, 'GET', new_doctor_path)
-  print 'IDs of Doctors after second PUT:'
-  testutil.request_and_show(conn, 'GET', '/Doctor/')
-
+  if verbose: print 'New Doctor just not-changed:'
+  new_doctor = testutil.request_and_show(conn, 'GET', new_doctor_path, verbose)
+  if new_doctor['name'] != docname:
+    print 'New doctor name should be %r, is %r instead after 2nd PUT' % (
+        docname, new_doctor['name'])
+    sys.exit(1)
+  if verbose: print 'IDs of Doctors after second PUT:'
+  doctorids = testutil.request_and_show(conn, 'GET', '/Doctor/', verbose)
+  if len(doctorids) != num_doctors:
+    print 'Had %d doctors, put %d again, should have %d but have %d' % (
+        num_doctors, 1, num_doctors, len(doctorids))
+    sys.exit(1)
 
 
 testutil.main(doTemplateTest)
+
