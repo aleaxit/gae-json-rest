@@ -77,6 +77,14 @@ class RestUrlHandler(URLHandler):
   ('model_strid', 'foobar', '23', '')
   >>> h.process('/foobar/23/blop')
   ('model_strid_method', 'foobar', '23', 'blop', '')
+  >>> h.process('/foobar?hello=world')
+  ('model', 'foobar', 'hello=world')
+  >>> h.process('')
+  >>> h.process('/foobar/43/barfoo?fname=foo&lname=bar')
+  ('model_strid_method', 'foobar', '43', 'barfoo', 'fname=foo&lname=bar')
+  >>> h.process('?hello=world')
+  >>> h.process('?hello=world&/one/two/three')
+  >>> h.process('////////')
   >>>
   """
 
