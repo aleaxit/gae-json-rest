@@ -7,7 +7,7 @@ import re
 logger = logging.getLogger()
 logger.setLevel(getattr(logging, os.environ.get('LOGLEVEL', 'WARNING')))
 
-class URLHandler(object):
+class UrlHandler(object):
   """ Perform appropriate callbacks when a URL matches a regex pattern.
       
       Instantiate h with a prefix (to be matched, but ignored if it matches),
@@ -23,7 +23,7 @@ class URLHandler(object):
         by those matched in the specific regex that matched after that.
       So for example:
       >>> def show(**k): print sorted(k.items())
-      >>> h = URLHandler(r'/(?P<foo>\w+)/',
+      >>> h = UrlHandler(r'/(?P<foo>\w+)/',
       ...                (r'(?P<bar>\d+)', show),
       ...                (r'(?P<foo>[^/]*)', show),
       ...                )
@@ -61,7 +61,7 @@ class URLHandler(object):
     return None
 
 
-class RestUrlHandler(URLHandler):
+class RestUrlHandler(UrlHandler):
   """ Specifically matterns the REs associated with REST-shaped URLs.
 
   >>> h = RestUrlHandler('')
@@ -125,7 +125,7 @@ class RestUrlHandler(URLHandler):
     self._addurl('model', re_model)
 
     self._process_urls(sr_query)
-    URLHandler.__init__(self, prefix, *self._urls)
+    UrlHandler.__init__(self, prefix, *self._urls)
     del self._urls
 
   # query = cgi.parse_sql(query, keep_blank_values=True)
