@@ -7,9 +7,9 @@ import re
 logger = logging.getLogger()
 logger.setLevel(getattr(logging, os.environ.get('LOGLEVEL', 'WARNING')))
 
-class UrlHandler(object):
-  """ Perform appropriate callbacks when a URL matches a regex pattern.
-      
+class UrlParser(object):
+  """ Parse a URL path and perform appropriate an callback on regex-matching.
+
       Instantiate h with a prefix (to be matched, but ignored if it matches),
         followed by as many (regex, callback) pairs as needed.
       Then, call h.process(path): if the path matches the prefix, then
@@ -17,13 +17,13 @@ class UrlHandler(object):
         upon the first match if any, the corresponding callback gets called
         (and its results returned).
         If the prefix does not match, or none of the regexes does, then
-        method process returns None.
+        method call h.process(path) returns None.
       The callback is passed *NAMED* arguments (only!) corresponding to
         the positional groups matched in the prefix, augmented or overridden
         by those matched in the specific regex that matched after that.
       So for example:
       >>> def show(**k): print sorted(k.items())
-      >>> h = UrlHandler(r'/(?P<foo>\w+)/',
+      >>> h = UrlParser(r'/(?P<foo>\w+)/',
       ...                (r'(?P<bar>\d+)', show),
       ...                (r'(?P<foo>[^/]*)', show),
       ...                )
@@ -32,9 +32,13 @@ class UrlHandler(object):
       >>> h.process('/zipzop/whoo/whatever')
       [('foo', 'whoo')]
   """
-  
+
   def __init__(self, prefix, *args):
-    """ Takes a prefix to be ignored and a list of (regex, callback) args.
+    """ Takes a prefix to be ignored and 0+ (regex, callback) pair args.
+
+    Args:
+      prefix: a string regex pattern
+      args: 0+ pairs (regex_pattern, callback) [each a string + a callable]
     """
     self.prefix = re.compile(prefix)
     logging.debug('prefix: %r', prefix)
@@ -45,6 +49,11 @@ class UrlHandler(object):
 
   def process(self, path):
     """ Match the path to one of the regexs and call the appropriate callback.
+
+    Args:
+      path: a string URL (complete path) to parse
+    Returns:
+      the result of the appropriate callback, or None if no match
     """
     prefix_mo = self.prefix.match(path)
     if not prefix_mo:
@@ -55,16 +64,18 @@ class UrlHandler(object):
     for regex, callback in self.callbacks:
       mo = regex.match(pathrest)
       if mo:
+        logging.debug('Matched %r, calling %r', regex, callback)
         named_args = prefix_mo.groupdict()
         named_args.update(mo.groupdict())
         return callback(**named_args)
+    logging.debug('No match for %r', pathrest)
     return None
 
 
-class RestUrlHandler(UrlHandler):
-  """ Specifically matterns the REs associated with REST-shaped URLs.
+class RestUrlParser(UrlParser):
+  """ Specifically dispatches on the REs associated with REST-shaped URLs.
 
-  >>> h = RestUrlHandler('')
+  >>> h = RestUrlParser('')
   >>> h.process('/$foobar')
   ('special', '$foobar', '')
   >>> h.process('/foobar')
@@ -92,7 +103,30 @@ class RestUrlHandler(UrlHandler):
     self._urls.append((name, regex))
 
   def __init__(self, prefix, **overrides):
+    """ Set the prefix-to-ignore, optionally override methods.
 
+    Args:
+      prefix: a string regex pattern
+      overrides: 0+ named arguments; values are callables to override the
+        methods RestUrlParser provides (which just return tuples of strings),
+        and each such callable must be signature-compatible with the
+        corresponding named method.  The methods & signaturs are:
+          do_special(special, query)
+          do_model(model, query)
+          do_special_method(special, method, query)
+          do_model_method(model, method, query)
+          do_model_strid(model, strid, query)
+          do_model_strid_method(model, strid, method, query)
+
+        The *names* (not necessarily the order) of the arguments matter.
+
+        The values of all arguments are strings (the substrings of the
+          incoming path that match the respective items of the REST URL).
+
+          strid is always 1+ digits; special is '$' + a valid identifier;
+          query is (supposed to be) a URL query part; model and method
+          are identifiers.
+    """
     # let each method be overridden by caller upon construction
     self.__dict__.update(overrides)
 
@@ -125,7 +159,7 @@ class RestUrlHandler(UrlHandler):
     self._addurl('model', re_model)
 
     self._process_urls(sr_query)
-    UrlHandler.__init__(self, prefix, *self._urls)
+    UrlParser.__init__(self, prefix, *self._urls)
     del self._urls
 
   # query = cgi.parse_sql(query, keep_blank_values=True)
@@ -158,4 +192,3 @@ def _test():
 
 if __name__ == "__main__":
     _test()
-
