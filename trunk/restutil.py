@@ -18,6 +18,23 @@
    them (so each db.Model subclass gets a chance to special-case some or all
    of its instance's property attributes). The_from_string method is not  
 
+   The module also offers the ability to register and retrieve (by string
+   names):
+   -- 'special objects' (model-like, but with no entities)
+     such a registration just creates a namespace (for registering methods on)
+       which is represented as a dict
+   -- 'methods' which can be registered as (any one of; for >1 register again)
+     -- callable on a special object,
+     -- callable on a model,
+     -- callable on any entity of a model
+     all such registrations require a callable taking named args which are
+       lists coming from the cgi.parse_qs parsing of a query string;
+     the callable object registered for a method that's registered as callable
+       on any entity of a model also takes a first argument 'self' that is
+       the specific entity on which it is being called.
+   -- entry points to query all the methods callable on a special object,
+        model, or, any entity of a given model
+
 """
 import datetime
 import inspect
@@ -47,6 +64,45 @@ def isProperty(x):
          ) and not isinstance(x, db._ReverseReferenceProperty)
 
 
+specials_registry = dict()
+def registerSpecialByName(name):
+  if name in specials_registry:
+    raise KeyError, 'Duplicate name %r for specials registry' % name
+  specials_registry[name] = dict(_n=name)
+
+def specialFromName(name):
+  """ Get special object with the given name (None if none).
+
+  Args:
+    name: a string that should be registered as name for a special object
+  Returns:
+    dict that's the special object thus named, None if none
+  """
+  return specials_registry.get(name)
+
+def allSpecialNames():
+  """ Return a list of strings, all special object names in registry. """
+  return sorted(specials_registry)
+
+def registerSpecialMethod(special, name, method):
+  if isinstance(special, str):
+    spc = specialFromName(special)
+    if spc is None:
+      raise KeyError, 'No special %r' % special
+    special = spc
+  if name in special:
+    raise KeyError, 'Duplicated method name %r for special %r' % (
+        name, special['_n'])
+  special[name] = method
+
+def specialMethodFromName(special, name):
+  if isinstance(special, str):
+    special = specialFromName(special)
+  if special is None:
+    return None
+  return special.get(name)
+
+
 model_class_registry = dict()
 
 def registerClassByName(cls, name=None):
@@ -55,6 +111,7 @@ def registerClassByName(cls, name=None):
   if name in model_class_registry:
     raise KeyError, 'Duplicate name %r for model class registry' % name
   model_class_registry[name] = cls
+  setattr(cls, '_n', name)
 
 def isModelClass(x):
   """ Is object x a subclass of db.Model?
@@ -89,9 +146,58 @@ def modelClassFromName(classname):
   """
   return model_class_registry.get(classname)
 
+def nameFromModelClass(cls):
+  """ Get the name a db.Model subclass is registered under (or None). """
+  return getattr(cls, '_n', None)
+
 def allModelClassNames():
   """ Return a list of strings, all model class names in registry. """
   return sorted(model_class_registry)
+
+def _getter(model, an):
+  if isinstance(model, str):
+    mdl = modelClassFromName(model)
+    if mdl is None:
+      raise KeyError, 'No model named %r' % model
+    model = mdl
+  mm = getattr(model, an, None)
+  if mm is None:
+    mm = dict()
+    setattr(model, an, mm)
+
+def _registerMethod(model, name, method, _getter_an):
+  model, mm = _getter(model, _getter_an)
+  if name in mm:
+    raise KeyError, 'Duplicate name %r for method in model %r' % (name,
+        nameFromModelClass(model))
+  mm[name] = method
+
+def _methodByName(model, name, _getter_an):
+  model, mm = _getter(model, _getter_an)
+  return mm.get(name)
+
+def _allMethods(model, _getter_an):
+  model, mm = _getter(model, _getter_an)
+  return sorted(mm)
+
+def registerModelMethod(model, name, method):
+  return _registerMethod(model, name, method, '_mm')
+
+def modelMethodByName(model, name):
+  return _methodByName(model, name, '_mm')
+
+def allModelMethods(model):
+  return _allMethods(model, '_mm')
+
+def registerInstanceMethod(model, name, method):
+  return _registerMethod(model, name, method, '_im')
+
+def instanceMethodByName(model, name):
+  return _methodByName(model, name, '_im')
+  return mm.get(name)
+
+def allInstanceMethods(model):
+  return _allMethods(model, '_im')
 
 
 def modelInstanceByClassAndId(s):
