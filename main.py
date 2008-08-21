@@ -13,7 +13,7 @@ import restutil
 
 # TODO: queries, methods, schemas, and MUCH better error-handling!-)
 
-class CrudRestHandler(cookutil.CookieHandler):
+class CrudRestHandler(webapp.RequestHandler, cookutil.CookieMixin):
 
   def _serve(self, data):
     return jsonutil.send_json(self.response, data)
