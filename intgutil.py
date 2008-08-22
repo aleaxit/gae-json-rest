@@ -1,26 +1,17 @@
-''' Json-Rest-handlin' integration mix-in helper.
+''' Json-Rest-handlin' integration helper.
 
-This module offers a JSON+REST-handling integration mixin class meant to be
-used with Google App Engine (mixed into a webapp.RequestHandler subclass) but
-can in fact be mixed into any class offering:
-  - a self.request object offering:
-    ...
-  - a self.response object offering:
-    ...
+This module offers a JSON+REST-handling integration class meant to be used with
+Google App Engine (hooked into a webapp.RequestHandler subclass) but can in
+fact be hooked up by simply passing an object with attributes self.request and
+self.response that are duck-like those of webapp.RequestHandler.
 
-To customize the mixin's behavior, the subclass that mixes it in may/should:
-  - define prefix_to_ignore as a regex pattern _without_ named groups
-    if the URLs to analize are supposed start with such a prefix to
-    be ignored (default is / -- no prefix is either expected or ignored)
+On hookup, the integration-helper class overrides the get/set/put/delete
+methods of the object hooking up to it so that they respond appropriately to
+REST requests (as documented in json_rest.txt) based on registrations performed
+in restutil, parsing and formatting JSON payloads based on jsonutil.
 
-The mixin class supplies methods to:
-  - parse a REST url with parsutil, dispatching appropriately to...
-  - ... get/set/put/delete methods that respond appropriately to
-        such REST requests (as documented in json_rest.txt) based
-        on registrations performed in restutil, parsing and
-        formatting JSON payloads based on jsonutil
-IOW, this mixin integrates functionaity found in other modules of
-the gae-json-rest package:
+IOW, this helper integrates functionality found in other modules of the
+gae-json-rest package:
   parsutil
   restutil
   jsonutil
@@ -39,69 +30,110 @@ class JsonRestMixin(object):
   prefix_to_ignore = '/'
   __delete_parser = __put_parser = __post_parser = __get_parser = None
 
+  def hookup(self, handler):
+    """ TODO: write method hookup! """
+
+  def hookdown(self):
+    """ TODO: write method hookdown! """
+
   def _serve(self, data):
     return jsonutil.send_json(self.response, data)
 
-  def do_delete(self, modelname, strid):
+  def get_model(self, modelname):
+    model = restutil.modelClassFromName(modelname)
+    if model is None:
+      self.response.set_status(400, 'Model %r not found' % modelname)
+    return model
+
+  def get_special(self, specialname):
+    special = restutil.specialFromName(specialname)
+    if special is None:
+      self.response.set_status(400, 'Model %r not found' % modelname)
+    return model
+
+  def get_entity(self, modelname, strid):
+    model = self.get_model(modelname)
+    if model is None: return None
+    entity = model.get_by_id(int(strid))
+    if entity is None:
+      self.response.set_status(404, "Entity %s/%s not found" %
+                               (modelname, strird))
+    return entity 
+
+  def do_delete(self, modelname, strid, query):
     entity = self.get_entity(modelname, strid)
     if entity is not None:
       entity.delete()
-    return ''
+    return {}
 
-  def delete(self):
-    """ Delete an entity of model given by path /classname/id.
+  def delete(self, prefix=None):
+    """ Delete an entity given by path modelname/strid
         Response is JSON for an empty jobj.
     """
     if self.__delete_parser is None:
       self.__delete_parser = parsutil.RestUrlParser(self.prefix_to_ignore,
           do_model_strid=self.do_delete)
     path = self.request.path
-    result = self.__delete_parser.process(path)
+    result = self.__delete_parser.process(path, prefix)
     if result is None or isintance(result, tuple):
       self.response.set_status(400, 'Invalid URL for DELETE: %r' % path)
-    self._serve({})
+    return self._serve(result)
 
-# TODO(aleax): keep writing this...!
+  def do_put(self, modelname, strid, query):
+    jobj = jsonutil.receive_json(self.request)
+    jobj = jsonutil.update_entity(entity, jobj)
+    updated_entity_path = "/%s/%s" % (self._classname, jobj['id'])
+    self.response.set_status(200, 'Updated entity %s' % updated_entity_path)
+    return jobj
 
-  def _get_model_and_entity(self, need_model, need_id):
-    """ Analyze self.request.path to get model and entity.
-
-    Args:
-      need_model: bool: if True, fail if classname is missing
-      need_id: bool: if True, fail if ID is missing
-
-    Returns 3-item tuple:
-      failed: bool: True iff has failed
-      model: class object or None
-      entity: instance of model or None
+  def put(self, prefix=None):
+    """ Update an entity given by path modelname/strid
+        Request body is JSON for the needed changes
+        Response is JSON for the updated entity.
     """
-    classname, strid = jsonutil.path_to_classname_and_id(self.request.path)
-    self._classname = classname
-    if not classname:
-      if need_model:
-        self.response.set_status(400, 'Cannot do it without a model.')
-      return need_model, None, None
-    model = restutil.modelClassFromName(classname)
-    if model is None:
-      self.response.set_status(400, 'Model %r not found' % classname)
-      return True, None, None
-    if not strid:
-      if need_id:
-        self.response.set_status(400, 'Cannot do it without an ID.')
-      return need_id, model, None
+    if self.__put_parser is None:
+      self.__put_parser = parsutil.RestUrlParser(self.prefix_to_ignore,
+          do_model_strid=self.do_put)
+    path = self.request.path
+    result = self.__put_parser.process(path, prefix)
+    if result is None or isintance(result, tuple):
+      self.response.set_status(400, 'Invalid URL for POST: %r' % path)
+      return self._serve({})
+    return self._serve(result)
+
+  def do_post_special_method(self, specialname, methodname):
+    """ TODO: write the various do_post_... methods! """
+
+  def post(self, prefix=None):
+    """ Create an entity ("call a model") or perform other non-R/O "call".
+
+        Request body is JSON for the needed entity or other call "args".
+        Response is JSON for the updated entity (or "call result").
+    """
+    if self.__post_parser is None:
+      self.__post_parser = parsutil.RestUrlParser(self.prefix_to_ignore,
+          do_special_method=self.do_post_special_method,
+          do_model=self.do_post_model,
+          do_model_method=self.do_post_model_method)
+    path = self.request.path
+    result = self.__post_parser.process(path, prefix)
+    if result is None or isintance(result, tuple):
+      self.response.set_status(400, 'Invalid URL for PUT: %r' % path)
+      return self._serve({})
     try:
-      numid = int(strid)
-    except TypeError:
-      self.response.set_status(400, 'ID %r is not numeric.' % strid)
-      return True, model, None
+      strid = result['id']
+    except (KeyError, TypeError):
+      pass
     else:
-      entity = model.get_by_id(numid)
-      if entity is None:
-        self.response.set_status(404, "Entity %s not found" % self.request.path)
-        return True, model, None
-    return False, model, entity
- 
+      new_entity_path = "/%s/%s" % (self._classname, strid)
+      logging.info('Post (%r) created %r', path, new_entity_path)
+      self.response.headers['Location'] = new_entity_path
+      self.response.set_status(201, 'Created entity %s' % new_entity_path)
+    self._serve(result)
+
+
   def get(self):
+    """ TODO: rewrite get! """
     """ Get JSON data for model names, entity IDs of a model, or an entity.
 
     Depending on the request path, serve as JSON to the response object:
@@ -137,20 +169,6 @@ class JsonRestMixin(object):
     logging.info('Post created %r', new_entity_path)
     self.response.headers['Location'] = new_entity_path
     self.response.set_status(201, 'Created entity %s' % new_entity_path)
-
-  def put(self):
-    """ Update an entity of model given by path /classname/id.
-
-        Request body is JSON for a jobj for an existing entity.
-        Response is JSON for a jobj for the updated entity.
-    """
-    failed, model, entity = self._get_model_and_entity(True, True)
-    if failed: return
-    jobj = jsonutil.receive_json(self.request)
-    jobj = jsonutil.update_entity(entity, jobj)
-    self._serve(jobj)
-    updated_entity_path = "/%s/%s" % (self._classname, jobj['id'])
-    self.response.set_status(200, 'Updated entity %s' % updated_entity_path)
 
 
 def main():
