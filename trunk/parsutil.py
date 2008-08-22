@@ -31,6 +31,9 @@ class UrlParser(object):
       [('bar', '23'), ('foo', 'zipzop')]
       >>> h.process('/zipzop/whoo/whatever')
       [('foo', 'whoo')]
+
+      You can also override the prefix for a specific call to process by
+      passing a prefix explicitly to that call.
   """
 
   def __init__(self, prefix, *args):
@@ -40,21 +43,24 @@ class UrlParser(object):
       prefix: a string regex pattern
       args: 0+ pairs (regex_pattern, callback) [each a string + a callable]
     """
-    self.prefix = re.compile(prefix)
+    self.prefix = re.compile(prefix or '')
     logging.debug('prefix: %r', prefix)
     self.callbacks = []
     for pattern, callback in args:
       logging.debug('%r -> %r', pattern, callback)
       self.callbacks.append((re.compile(pattern), callback))
 
-  def process(self, path):
+  def process(self, path, prefix=None):
     """ Match the path to one of the regexs and call the appropriate callback.
 
     Args:
       path: a string URL (complete path) to parse
+      prefix: if not None, overrides self.prefix from now on
     Returns:
       the result of the appropriate callback, or None if no match
     """
+    if prefix is not None and prefix != self.prefix.pattern:
+      self.prefix.pattern = re.compile(prefix)
     prefix_mo = self.prefix.match(path)
     if not prefix_mo:
       logging.debug('No prefix match for %r (%r)', path, self.prefix)
@@ -102,11 +108,21 @@ class RestUrlParser(UrlParser):
   def _addurl(self, name, regex):
     self._urls.append((name, regex))
 
-  def __init__(self, prefix, **overrides):
+  @staticmethod
+  def _doprefix(prefix):
+    if prefix is None: return None
+    prefix = prefix.strip('/')
+    if prefix: return '/%s/' % prefix
+    else: return '/'
+
+  def process(self, path, prefix=None):
+    return UrlHandler.process(self, path, self._doprefix(prefix))
+
+  def __init__(self, prefix=None, **overrides):
     """ Set the prefix-to-ignore, optionally override methods.
 
     Args:
-      prefix: a string regex pattern
+      prefix: a string regex pattern (or None, default)
       overrides: 0+ named arguments; values are callables to override the
         methods RestUrlParser provides (which just return tuples of strings),
         and each such callable must be signature-compatible with the
@@ -131,9 +147,7 @@ class RestUrlParser(UrlParser):
     self.__dict__.update(overrides)
 
     # prefix always must absorb leading and trailing /
-    prefix = prefix.strip('/')
-    if prefix: prefix = '/%s/' % prefix
-    else: prefix = '/'
+    prefix = self._doprefix(prefix)
 
     # build URL regexes with corresponding names
     self._urls = []
