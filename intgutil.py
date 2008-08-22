@@ -25,42 +25,153 @@ import parsutil
 import restutil
 
 
-class JsonRestMixin(object):
+class JsonRestHelper(object):
 
   prefix_to_ignore = '/'
   __delete_parser = __put_parser = __post_parser = __get_parser = None
 
   def hookup(self, handler):
-    """ TODO: write method hookup! """
+    """ "Hooks up" this helper to a handler object.
 
+    Args:
+      handler: an instance of a webapp.RequestHandler subclass
+    Side effects:
+      - sets self.request and self.response from the handler,
+      - sets self.handler to handler
+      - sets the handler's get, put, post and delete methods from self
+      - sets the handler's jrh attribute to self
+    Note this creates reference loops and MUST be undone in hookdown!
+    """
+    self.request = handler.request
+    self.response = handler.response
+    self.handler = handler
+    handler.get = self.get
+    handler.put = self.put
+    handler.post = self.post
+    handler.delete = self.delete
+    handler.jrh = self
+        
   def hookdown(self):
-    """ TODO: write method hookdown! """
+    """ Undoes the effects of self.hookup """
+    h = self.handler
+    h.jrh = self.request = self.response = self.handler = None
+    del h.get, h.put, h.post, h.delete
 
   def _serve(self, data):
-    return jsonutil.send_json(self.response, data)
+    """ Serves a result in JSON, and hooks-down from the handler """
+    try: return jsonutil.send_json(self.response, data)
+    finally: self.hookdown()
 
   def get_model(self, modelname):
+    """ Gets a model (or None) given a model name.
+
+    Args:
+      modelname: a string that should name a model
+    Returns:
+      a model class, or None (if no model's registered with that name)
+    Side effects:
+      sets response status to 400 if no model's registered with that name
+    """
     model = restutil.modelClassFromName(modelname)
     if model is None:
       self.response.set_status(400, 'Model %r not found' % modelname)
     return model
 
   def get_special(self, specialname):
+    """ Gets a special (or None) given a special name.
+
+    Args:
+      specialname: a string that should name a special
+    Returns:
+      a special object, or None (if no special's registered with that name)
+    Side effects:
+      sets response status to 400 if no special's registered with that name
+    """
     special = restutil.specialFromName(specialname)
     if special is None:
-      self.response.set_status(400, 'Model %r not found' % modelname)
-    return model
+      self.response.set_status(400, 'Model %r not found' % specialname)
+    return special
 
   def get_entity(self, modelname, strid):
+    """ Gets an entity (or None) given a model name and entity ID as string.
+
+    Args:
+      modelname: a string that should name a model
+      strid: the str(id) for the numeric id of an entity of that model
+    Returns:
+      an entity, or None (if something went wrong)
+    Side effects:
+      sets response status to 400 or 404 if various things went wrong
+    """
     model = self.get_model(modelname)
-    if model is None: return None
+    if model is None:
+      return None
     entity = model.get_by_id(int(strid))
     if entity is None:
       self.response.set_status(404, "Entity %s/%s not found" %
                                (modelname, strird))
     return entity 
 
+  def get_special_method(self, specialname, methodname):
+    special = self.get_special(specialname)
+    if special is None: return ''
+    method = special.get(methodname)
+    if method is None: 
+      self.response.set_status(400, 'Method %r not found in special' % (
+        methodname, specialname))
+    return method
+
+  def _methodhelper(self, modelname, methodname, _getter):
+    """ Gets a model or instance method given model and method names & getter.
+
+    Args:
+      modelname: a string that should name a model
+      methodname: a sring that should name a method of that model
+    Returns:
+      a method object, or None if either model or method were not found
+    Side effects:
+      sets response status to 400 if either model or method were not found
+    """
+    model = self.get_model(modelname)
+    if model is None: return ''
+    method = _getter(model, methodname)
+    if method is None: 
+      self.response.set_status(400, 'Method %r not found in model' % (
+        methodname, modelname))
+    return method
+
+  def get_model_method(self, modelname, methodname):
+    """ Gets a model's method given model and method names.
+
+    Args:
+      modelname: a string that should name a model
+      methodname: a sring that should name a method of that model
+    Returns:
+      a method object, or None if either model or method were not found
+    Side effects:
+      sets response status to 400 if either model or method were not found
+    """
+    return self._methodhelper(model, methodname, restutil.modelMethodByName)
+
+  def get_instance_method(self, modelname, methodname):
+    """ Gets an instance method given model and method names.
+
+    Args:
+      modelname: a string that should name a model
+      methodname: a sring that should name an instance method of that model
+    Returns:
+      a method object, or None if either model or method were not found
+    Side effects:
+      sets response status to 400 if either model or method were not found
+    """
+    return self._methodhelper(model, methodname, restutil.instanceMethodByName)
+
+
   def do_delete(self, modelname, strid, query):
+    """ Hook method to delete an entity given modelname, strid & query.
+
+        This version actually ignores the query string.
+    """
     entity = self.get_entity(modelname, strid)
     if entity is not None:
       entity.delete()
@@ -75,11 +186,15 @@ class JsonRestMixin(object):
           do_model_strid=self.do_delete)
     path = self.request.path
     result = self.__delete_parser.process(path, prefix)
-    if result is None or isintance(result, tuple):
+    if result is None or isinstance(result, tuple):
       self.response.set_status(400, 'Invalid URL for DELETE: %r' % path)
     return self._serve(result)
 
   def do_put(self, modelname, strid, query):
+    """ Hook method to update an entity given modelname, strid & query.
+
+        This version actually ignores the query string.
+    """
     jobj = jsonutil.receive_json(self.request)
     jobj = jsonutil.update_entity(entity, jobj)
     updated_entity_path = "/%s/%s" % (self._classname, jobj['id'])
@@ -96,13 +211,60 @@ class JsonRestMixin(object):
           do_model_strid=self.do_put)
     path = self.request.path
     result = self.__put_parser.process(path, prefix)
-    if result is None or isintance(result, tuple):
+    if result is None or isinstance(result, tuple):
       self.response.set_status(400, 'Invalid URL for POST: %r' % path)
       return self._serve({})
     return self._serve(result)
 
-  def do_post_special_method(self, specialname, methodname):
-    """ TODO: write the various do_post_... methods! """
+  def do_post_special_method(self, specialname, methodname, query):
+    """ Hook method to call a method on a special object given names.
+
+        This version actually ignores the query string.
+    """
+    method = self.get_special_method(specialname, methodname)
+    if special is None: return ''
+    try: return method()
+    except Exception, e:
+      self.response.set_status(400, "Can't call %r/%r: %s" % (
+        specialname, methodname, e))
+      return ''
+
+  def do_post_model(self, modelname, query):
+    """ Hook method to "call a model" (to create an entity)
+
+        This version actually ignores the query string.
+    """
+    model = self.get_model(modelname)
+    if model is None: return ''
+    # TODO: complete this!
+
+  def do_post_model_method(self, modelname, methodname, query):
+    """ Hook method to call a method on a model given names.
+
+        This version actually ignores the query string.
+    """
+    method = self.get_model_method(modelname, methodname)
+    if method is None: return ''
+    try: return method()
+    except Exception, e:
+      self.response.set_status(400, "Can't call %r/%r: %s" % (
+        modelname, methodname, e))
+      return ''
+
+  def do_post_entity_method(self, modelname, strid, methodname, query):
+    """ Hook method to call a method on an entity given names and strid.
+
+        This version actually ignores the query string.
+    """
+    method = self.get_instance_method(modelname, methodname)
+    if method is None: return ''
+    entity = self.get_entity(modelname, strid)
+    if entity is None: return ''
+    try: return method(entity)
+    except Exception, e:
+      self.response.set_status(400, "Can't call %r/%r/%r: %s" % (
+        modelname, strid, methodname, e))
+      return ''
 
   def post(self, prefix=None):
     """ Create an entity ("call a model") or perform other non-R/O "call".
@@ -110,26 +272,29 @@ class JsonRestMixin(object):
         Request body is JSON for the needed entity or other call "args".
         Response is JSON for the updated entity (or "call result").
     """
+    # TODO: fix post's body!
     if self.__post_parser is None:
       self.__post_parser = parsutil.RestUrlParser(self.prefix_to_ignore,
           do_special_method=self.do_post_special_method,
           do_model=self.do_post_model,
-          do_model_method=self.do_post_model_method)
+          do_model_method=self.do_post_model_method,
+          do_model_strid_method=self.do_post_entity_method,
+          )
     path = self.request.path
     result = self.__post_parser.process(path, prefix)
-    if result is None or isintance(result, tuple):
-      self.response.set_status(400, 'Invalid URL for PUT: %r' % path)
+    if result is None or isinstance(result, tuple):
+      self.response.set_status(400, 'Invalid URL for POST: %r' % path)
       return self._serve({})
     try:
       strid = result['id']
-    except (KeyError, TypeError):
+    except (KeyError, AttributeError, TypeError):
       pass
     else:
       new_entity_path = "/%s/%s" % (self._classname, strid)
       logging.info('Post (%r) created %r', path, new_entity_path)
       self.response.headers['Location'] = new_entity_path
       self.response.set_status(201, 'Created entity %s' % new_entity_path)
-    self._serve(result)
+    return self._serve(result)
 
 
   def get(self):
