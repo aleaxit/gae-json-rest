@@ -17,14 +17,6 @@ def body(**k):
   return simplejson.dumps(k)
 
 
-def getAny(conn, classname):
-  """ Returns the ID of any one existing entity of the model, or None
-  """
-  data = silent_request(conn, 'GET', '/%s/' % classname)
-  if data: return data[0]['id']
-  else: return None
-
-
 class Tester(object):
   def __init__(self, f):
     self.f = f
@@ -98,10 +90,7 @@ class Tester(object):
   def get_cookies(self):
     opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(self.cj))
     opener.open("http://%s:%s" % (self.host, self.port))
-    d = {}
-    for c in self.cj:
-      d[c.name] = c.value
-    return d
+    return dict((c.name, c.value) for c in self.cj)
 
   def execute(self):
     try:
@@ -109,6 +98,6 @@ class Tester(object):
     except socket.error, e:
       print "Cannot connect: %s"
       sys.exit(1)
-    self.f(self).run()
+    self.f(self, self.verbose)
     print 'All done OK!'
 
