@@ -6,7 +6,7 @@ import testutil
 def doTemplateTest(tester, verbose):
   # what models do we have? shd be Doctor and Pager
   if verbose: print 'Getting names for Models:'
-  modelnames = tester.request_and_show('GET', '/', verbose)
+  modelnames = tester.request_and_show('GET', '/')
   try:
     assert set(modelnames) == set(('Doctor', 'Pager'))
   except:
@@ -15,7 +15,7 @@ def doTemplateTest(tester, verbose):
 
   # do we know any Doctors?
   if verbose: print 'IDs of Doctors before any operations:'
-  doctorids = tester.request_and_show('GET', '/Doctor/', verbose)
+  doctorids = tester.request_and_show('GET', '/Doctor/')
   # get the highest-known Doctor ID, if any, to ensure a unique number
   if doctorids:
     unique = max(int(obj['id']) for obj in doctorids) + 1
@@ -41,21 +41,20 @@ def doTemplateTest(tester, verbose):
   docname = 'Dr. John %s' % unique
   # make entity with that name
   post_body = testutil.body(name=docname)
-  post_result = tester.request_and_show('POST', '/Doctor/', verbose,
-      post_body)
+  post_result = tester.request_and_show('POST', '/Doctor/', post_body)
   new_doctor_id = post_result['id']
   new_doctor_path = '/Doctor/%s' % new_doctor_id
   if verbose: print 'Created %r' % new_doctor_path
   # show new doctor just created
   if verbose: print 'New Doctor just created:'
-  new_doctor = tester.request_and_show('GET', new_doctor_path, verbose)
+  new_doctor = tester.request_and_show('GET', new_doctor_path)
   if new_doctor['name'] != docname:
     print 'New doctor name should be %r, is %r instead after POST' % (
         docname, new_doctor['name'])
     sys.exit(1)
   # show IDs after the POST
   if verbose: print 'IDs of Doctors after POST:'
-  doctorids = tester.request_and_show('GET', '/Doctor/', verbose)
+  doctorids = tester.request_and_show('GET', '/Doctor/')
   if len(doctorids) != num_doctors + 1:
     print 'Had %d doctors, created %d, should have %d but have %d' % (
         num_doctors, 1, num_doctors+1, len(doctorids))
@@ -65,17 +64,16 @@ def doTemplateTest(tester, verbose):
   # Now change the name of the doctor
   docname = '%s changed' % docname
   put_body = testutil.body(name=docname)
-  put_result = tester.request_and_show('PUT', new_doctor_path, verbose,
-      put_body)
+  put_result = tester.request_and_show('PUT', new_doctor_path, put_body)
   # show new doctor just changed
   if verbose: print 'New Doctor just changed:'
-  new_doctor = tester.request_and_show('GET', new_doctor_path, verbose)
+  new_doctor = tester.request_and_show('GET', new_doctor_path)
   if new_doctor['name'] != docname:
     print 'New doctor name should be %r, is %r instead after PUT' % (
         docname, new_doctor['name'])
     sys.exit(1)
   if verbose: print 'IDs of Doctors after PUT:'
-  doctorids = tester.request_and_show('GET', '/Doctor/', verbose)
+  doctorids = tester.request_and_show('GET', '/Doctor/')
   if len(doctorids) != num_doctors:
     print 'Had %d doctors, put %d, should have %d but have %d' % (
         num_doctors, 1, num_doctors, len(doctorids))
@@ -83,16 +81,16 @@ def doTemplateTest(tester, verbose):
 
   # check idempotence of PUT
   if verbose: print 'Check PUT idempotence'
-  tester.request_and_show('PUT', new_doctor_path, verbose, put_body)
+  tester.request_and_show('PUT', new_doctor_path, put_body)
   # show new doctor just not-changed
   if verbose: print 'New Doctor just not-changed:'
-  new_doctor = tester.request_and_show('GET', new_doctor_path, verbose)
+  new_doctor = tester.request_and_show('GET', new_doctor_path)
   if new_doctor['name'] != docname:
     print 'New doctor name should be %r, is %r instead after 2nd PUT' % (
         docname, new_doctor['name'])
     sys.exit(1)
   if verbose: print 'IDs of Doctors after second PUT:'
-  doctorids = tester.request_and_show('GET', '/Doctor/', verbose)
+  doctorids = tester.request_and_show('GET', '/Doctor/')
   if len(doctorids) != num_doctors:
     print 'Had %d doctors, put %d again, should have %d but have %d' % (
         num_doctors, 1, num_doctors, len(doctorids))
