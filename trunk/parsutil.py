@@ -32,8 +32,19 @@ class UrlParser(object):
       >>> h.process('/zipzop/whoo/whatever')
       [('foo', 'whoo')]
 
-      You can also override the prefix for a specific call to process by
-      passing a prefix explicitly to that call.
+      You can also change the prefix by passing a prefix to .process(...) [the
+      new prefix-to-ignore is then remembered in lieu of the previous one].
+
+      >>> h.prefix.pattern
+      '/(?P<foo>\\\\w+)/'
+      >>> h.process('/zipzop/whoo/whatever', prefix='/')
+      [('foo', 'zipzop')]
+      >>> h.process('/zipzop/whoo/whatever')
+      [('foo', 'zipzop')]
+      >>> h.prefix.pattern
+      '/'
+
+      The h.prefix attribute is exposed, and it's a RE object.
   """
 
   def __init__(self, prefix, *args):
@@ -55,14 +66,14 @@ class UrlParser(object):
 
     Args:
       path: a string URL (complete path) to parse
-      prefix: if not None, overrides self.prefix from now on
+      prefix: if not None, a RE pattern string to change self.prefix from now on
     Returns:
       the result of the appropriate callback, or None if no match
     """
     if prefix is not None and prefix != self.prefix.pattern:
-      self.prefix.pattern = re.compile(prefix)
+      self.prefix = re.compile(prefix)
     prefix_mo = self.prefix.match(path)
-    if not prefix_mo:
+    if prefix_mo is None:
       logging.debug('No prefix match for %r (%r)', path, self.prefix)
       return None
     pathrest = path[prefix_mo.end():]
@@ -81,32 +92,26 @@ class UrlParser(object):
 class RestUrlParser(UrlParser):
   """ Specifically dispatches on the REs associated with REST-shaped URLs.
 
+  Note that h.process only takes an URL *path*, NOT the rest of the URL (no
+  protocol, no host, no query).
+
   >>> h = RestUrlParser('')
   >>> h.process('/$foobar')
-  ('special', '$foobar', '')
+  ('special', '$foobar')
   >>> h.process('/foobar')
-  ('model', 'foobar', '')
+  ('model', 'foobar')
   >>> h.process('/$foobar/zak/')
-  ('special_method', '$foobar', 'zak', '')
+  ('special_method', '$foobar', 'zak')
   >>> h.process('/foobar/zak/')
-  ('model_method', 'foobar', 'zak', '')
+  ('model_method', 'foobar', 'zak')
   >>> h.process('/foobar/23/')
-  ('model_strid', 'foobar', '23', '')
+  ('model_strid', 'foobar', '23')
   >>> h.process('/foobar/23/blop')
-  ('model_strid_method', 'foobar', '23', 'blop', '')
-  >>> h.process('/foobar?hello=world')
-  ('model', 'foobar', 'hello=world')
+  ('model_strid_method', 'foobar', '23', 'blop')
   >>> h.process('')
-  >>> h.process('/foobar/43/barfoo?fname=foo&lname=bar')
-  ('model_strid_method', 'foobar', '43', 'barfoo', 'fname=foo&lname=bar')
-  >>> h.process('?hello=world')
-  >>> h.process('?hello=world&/one/two/three')
   >>> h.process('////////')
   >>>
   """
-
-  def _addurl(self, name, regex):
-    self._urls.append((name, regex))
 
   @staticmethod
   def _doprefix(prefix):
@@ -116,7 +121,7 @@ class RestUrlParser(UrlParser):
     else: return '/'
 
   def process(self, path, prefix=None):
-    return UrlHandler.process(self, path, self._doprefix(prefix))
+    return UrlParser.process(self, path, self._doprefix(prefix))
 
   def __init__(self, prefix=None, **overrides):
     """ Set the prefix-to-ignore, optionally override methods.
@@ -127,74 +132,63 @@ class RestUrlParser(UrlParser):
         methods RestUrlParser provides (which just return tuples of strings),
         and each such callable must be signature-compatible with the
         corresponding named method.  The methods & signaturs are:
-          do_special(special, query)
-          do_model(model, query)
-          do_special_method(special, method, query)
-          do_model_method(model, method, query)
-          do_model_strid(model, strid, query)
-          do_model_strid_method(model, strid, method, query)
+          do_special(special)
+          do_model(model)
+          do_special_method(special, method)
+          do_model_method(model, method)
+          do_model_strid(model, strid)
+          do_model_strid_method(model, strid, method)
 
-        The *names* (not necessarily the order) of the arguments matter.
+        The *names* (not necessarily the *order*) of the arguments matter.
 
         The values of all arguments are strings (the substrings of the
-          incoming path that match the respective items of the REST URL).
-
-          strid is always 1+ digits; special is '$' + a valid identifier;
-          query is (supposed to be) a URL query part; model and method
-          are identifiers.
+          incoming path that match the respective items of the REST URL):
+            strid is always 1+ digits; special is '$' + a valid identifier;
+            model and method are identifiers.
     """
-    # let each method be overridden by caller upon construction
+    # let each method be overridden (in the instance) by caller at ctor-time
     self.__dict__.update(overrides)
 
-    # prefix always must absorb leading and trailing /
+    # prefix must always absorb leading and trailing /
     prefix = self._doprefix(prefix)
 
     # build URL regexes with corresponding names
-    self._urls = []
+    urls = []
+    def addurl(name, regex): urls.append((regex, getattr(self, 'do_'+name)))
 
     sr_method = r'/(?P<method>\w+)'
     sr_strid = r'/(?P<strid>\d+)'
-    sr_query = r'/?\??(?P<query>.*)'
 
     # special_method must be before special (ie. special_method > special)
     re_special = r'(?P<special>\$\w+)/?'
     re_special_method = re_special + sr_method
-    self._addurl('special_method', re_special_method)
-    self._addurl('special', re_special)
+    addurl('special_method', re_special_method)
+    addurl('special', re_special)
 
     # model_strid_method > model_strid > model_method > model
     re_model = r'(?P<model>\w+)/?'
     re_model_method = re_model + sr_method
     re_model_strid = re_model + sr_strid
     re_model_strid_method = re_model_strid + sr_method
-    self._addurl('model_strid_method', re_model_strid_method)
-    self._addurl('model_strid', re_model_strid)
-    self._addurl('model_method', re_model_method)
-    self._addurl('model', re_model)
+    addurl('model_strid_method', re_model_strid_method)
+    addurl('model_strid', re_model_strid)
+    addurl('model_method', re_model_method)
+    addurl('model', re_model)
 
-    self._process_urls(sr_query)
-    UrlParser.__init__(self, prefix, *self._urls)
-    del self._urls
+    UrlParser.__init__(self, prefix, *urls)
 
-  # query = cgi.parse_sql(query, keep_blank_values=True)
-
-  def _process_urls(self, sr_query):
-    for i, (name, regex) in enumerate(self._urls):
-      metho = getattr(self, 'do_' + name)
-      self._urls[i] = regex + sr_query, metho
-
-  def do_special(self, special, query):
-    return 'special', special, query
-  def do_model(self, model, query):
-    return 'model', model, query
-  def do_special_method(self, special, method, query):
-    return 'special_method', special, method, query
-  def do_model_method(self, model, method, query):
-    return 'model_method', model, method, query
-  def do_model_strid(self, model, strid, query):
-    return 'model_strid', model, strid, query
-  def do_model_strid_method(self, model, strid, method, query):
-    return 'model_strid_method', model, strid, method, query
+  def do_special(self, special):
+    return 'special', special
+  def do_model(self, model):
+    return 'model', model
+  def do_special_method(self, special, method):
+    return 'special_method', special, method
+  def do_model_method(self, model, method):
+    return 'model_method', model, method
+  def do_model_strid(self, model, strid):
+    return 'model_strid', model, strid
+  def do_model_strid_method(self, model, strid, method):
+    return 'model_strid_method', model, strid, method
 
 
 def _test():
