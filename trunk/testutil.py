@@ -30,14 +30,44 @@ class Tester(object):
     self.f = f
     self.cj = cookielib.CookieJar()
 
+    # get command-line options
+    #TODO - add command line for autostarting GAE web server
+    parser = optparse.OptionParser()
+    parser.add_option("-v", "--verbose",
+                      action="store_true", dest="verbose", default=False,
+                      help="print detailed info to stdout")
+    parser.add_option("-s", "--host", dest="host", default=DEFAULT_HOST,
+                      help="what host the server is running on")
+    parser.add_option("-p", "--port", dest="port", default=DEFAULT_PORT,
+                      type="int", help="what port the server is running on")
+    options, args = parser.parse_args()
+    if args:
+      print 'Unknown arguments:', args
+      sys.exit(1)
+ 
+    self.verbose = options.verbose
+    self.host = options.host
+    self.port = options.port
+
+  def getAny(self, classname):
+    """ Returns the ID of any one existing entity of the model, or None
+    """
+    data = silent_request(conn, 'GET', '/%s/' % classname)
+    if data: return data[0]['id']
+    else: return None
+
   def silent_request(self, verb, path, body=None):
     """ Makes an HTTP request, always silently.
 
         Returns the JSON-deserialized of the response body, or None.
     """
-    return self.request_and_show(verb, path, False, body)
+    prev = self.verbose
+    self.verbose = False
+    retval = self.request_and_show(verb, path, body)
+    self.verbose = prev
+    return retval
 
-  def request_and_show(self, verb, path, verbose, body=None):
+  def request_and_show(self, verb, path, body=None):
     """ Makes an HTTP request, optionally prints data about the interaction.
 
         Returns the JSON-deserialized of the response body, or None.
@@ -49,15 +79,15 @@ class Tester(object):
       print 'Cannot request %r %r: %s' % (verb, path, e)
       sys.exit(1)
     rl = self.conn.getresponse()
-    if verbose or rl.status//100 != 2:
+    if self.verbose or rl.status//100 != 2:
       print '%s %s gave: %s %r' % (verb, path, rl.status, rl.reason)
     if rl.status//100 == 2:
-      if verbose:
+      if self.verbose:
         print 'HEADERS:'
         for h, v in rl.getheaders(): print ' ', h, v
         print 'CONTENTS:'
       body = rl.read()
-      if verbose:
+      if self.verbose:
         for line in body.splitlines():
           print ' ', line
         print
@@ -71,24 +101,11 @@ class Tester(object):
     return [(c.name, c.value) for c in self.cj]
 
   def execute(self):
-    # get command-line options
-    parser = optparse.OptionParser()
-    parser.add_option("-v", "--verbose",
-                      action="store_true", dest="verbose", default=False,
-                      help="print detailed info to stdout")
-    parser.add_option("-s", "--host", dest="host", default=DEFAULT_HOST,
-                      help="what host the server is running on")
-    parser.add_option("-p", "--port", dest="port", default=DEFAULT_PORT,
-                      type="int", help="what port the server is running on")
-    options, args = parser.parse_args()
-    if args:
-      print 'Unknown arguments:', args
-      sys.exit(1)
     try:
-      self.conn = httplib.HTTPConnection(options.host, options.port, strict=True)
+      self.conn = httplib.HTTPConnection(self.host, self.port, strict=True)
     except socket.error, e:
       print "Cannot connect: %s"
       sys.exit(1)
-    self.f(self, options.verbose)
+    self.f(self, self.verbose)
     print 'All done OK!'
 
