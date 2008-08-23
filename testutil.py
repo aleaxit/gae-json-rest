@@ -95,10 +95,13 @@ class Tester(object):
     else:
       return None
 
-  def test_cookie(self):
+  def get_cookies(self):
     opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(self.cj))
-    opener.open("http://localhost:8080")
-    return [(c.name, c.value) for c in self.cj]
+    opener.open("http://%s:%s" % (self.host, self.port))
+    d = {}
+    for c in self.cj:
+      d[c.name] = c.value
+    return d
 
   def execute(self):
     try:
@@ -106,6 +109,6 @@ class Tester(object):
     except socket.error, e:
       print "Cannot connect: %s"
       sys.exit(1)
-    self.f(self, self.verbose)
+    self.f(self).run()
     print 'All done OK!'
 
