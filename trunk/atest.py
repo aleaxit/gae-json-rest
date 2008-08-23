@@ -98,9 +98,14 @@ def doTemplateTest(tester, verbose):
         num_doctors, 1, num_doctors, len(doctorids))
     sys.exit(1)
 
+  
+  # testing cookie functionality
+  # each call to test_cookie should return an incremented value of
+  # cookie named secret_key
+  if verbose: print 'Testing cookie functionality'
+  print tester.test_cookie()
+  print tester.test_cookie()
+  print tester.test_cookie()
 
 t = testutil.Tester(doTemplateTest)
 t.execute()
-
-#testutil.main(doTemplateTest)
-

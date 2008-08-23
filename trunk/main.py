@@ -16,6 +16,9 @@ import restutil
 class CrudRestHandler(webapp.RequestHandler, cookutil.CookieMixin):
 
   def _serve(self, data):
+    counter = self.get_cookie('counter')
+    if counter: self.set_cookie('counter', str(int(counter) + 1))
+    else: self.set_cookie('counter', '0')
     return jsonutil.send_json(self.response, data)
 
   def _get_model_and_entity(self, need_model, need_id):
