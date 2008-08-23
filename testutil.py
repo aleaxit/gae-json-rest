@@ -4,6 +4,8 @@ import httplib
 import optparse
 import socket
 import sys
+import cookielib
+import urllib2
 
 import simplejson
 
@@ -26,6 +28,7 @@ def getAny(conn, classname):
 class Tester(object):
   def __init__(self, f):
     self.f = f
+    self.cj = cookielib.CookieJar()
 
   def silent_request(self, verb, path, body=None):
     """ Makes an HTTP request, always silently.
@@ -33,7 +36,6 @@ class Tester(object):
         Returns the JSON-deserialized of the response body, or None.
     """
     return self.request_and_show(verb, path, False, body)
-
 
   def request_and_show(self, verb, path, verbose, body=None):
     """ Makes an HTTP request, optionally prints data about the interaction.
@@ -62,6 +64,11 @@ class Tester(object):
       return simplejson.loads(body)
     else:
       return None
+
+  def test_cookie(self):
+    opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(self.cj))
+    opener.open("http://localhost:8080")
+    return [(c.name, c.value) for c in self.cj]
 
   def execute(self):
     # get command-line options
