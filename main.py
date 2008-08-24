@@ -125,6 +125,7 @@ class CrudRestHandler(webapp.RequestHandler, cookutil.CookieMixin):
 
 
 def main():
+  logging.info('main.py main()')
   application = webapp.WSGIApplication([('/.*', CrudRestHandler)],
       debug=True)
   wsgiref.handlers.CGIHandler().run(application)
