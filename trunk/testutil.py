@@ -11,7 +11,7 @@ import simplejson
 
 DEFAULT_HOST = 'localhost'
 DEFAULT_PORT = 8080
-
+DEFAULT_PREFIX = ''
 
 def body(**k):
   return simplejson.dumps(k)
@@ -23,7 +23,7 @@ class Tester(object):
     self.cj = cookielib.CookieJar()
 
     # get command-line options
-    #TODO - add command line for autostarting GAE web server
+    #TODO - add command line option for autostarting a local GAE web server
     parser = optparse.OptionParser()
     parser.add_option("-v", "--verbose",
                       action="store_true", dest="verbose", default=False,
@@ -32,14 +32,19 @@ class Tester(object):
                       help="what host the server is running on")
     parser.add_option("-p", "--port", dest="port", default=DEFAULT_PORT,
                       type="int", help="what port the server is running on")
+    parser.add_option("-x", "--prefix", dest="prefix", default=DEFAULT_PREFIX,
+                      help="prefix to prepend to every path to test")
     options, args = parser.parse_args()
     if args:
       print 'Unknown arguments:', args
       sys.exit(1)
  
-    self.verbose = options.verbose
-    self.host = options.host
-    self.port = options.port
+    for attrib in 'verbose host port prefix'.split():
+      setattr(self, attrib, getattr(options, attrib))
+    # ensure prefix starts and doesn't end with / (or, is /)
+    self.prefix = self.prefix.strip('/')
+    if self.prefix: self.prefix = '/%s/' % self.prefix
+    else: self.prefix = '/'
 
   def getAny(self, classname):
     """ Returns the ID of any one existing entity of the model, or None
@@ -64,6 +69,7 @@ class Tester(object):
 
         Returns the JSON-deserialized of the response body, or None.
     """
+    path = '%s%s' % (self.prefix, path.lstrip('/'))
     try:
       if body is None: self.conn.request(verb, path)
       else: self.conn.request(verb, path, body)
