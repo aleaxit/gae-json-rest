@@ -116,6 +116,7 @@ class TemplateTest(object):
       sys.exit(1)
 
 
-test = TemplateTest()
-t = testutil.Tester(test)
-t.execute()
+if __name__ == '__main__':
+  test = TemplateTest()
+  t = testutil.Tester(test)
+  t.execute()
