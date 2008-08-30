@@ -1,11 +1,15 @@
 # common needs of JSON-REST-based client-side Python tests
 # (intended to be run while gae-json-rest is being served at localhost:8080)!
+import os
 import httplib
 import optparse
 import socket
 import sys
 import cookielib
 import urllib2
+import subprocess
+import time
+import signal
 
 import simplejson
 
@@ -21,9 +25,9 @@ class Tester(object):
   def __init__(self, f):
     self.f = f
     self.cj = cookielib.CookieJar()
+    self.gae = None
 
     # get command-line options
-    #TODO - add command line option for autostarting a local GAE web server
     parser = optparse.OptionParser()
     parser.add_option("-v", "--verbose",
                       action="store_true", dest="verbose", default=False,
@@ -34,11 +38,18 @@ class Tester(object):
                       type="int", help="what port the server is running on")
     parser.add_option("-x", "--prefix", dest="prefix", default=DEFAULT_PREFIX,
                       help="prefix to prepend to every path to test")
+    parser.add_option("-l", "--local-gae", action="store", dest="localgae",
+                      help="GAE SDK directory path")
+
     options, args = parser.parse_args()
     if args:
       print 'Unknown arguments:', args
       sys.exit(1)
- 
+
+    if options.localgae: # start the local GAE server
+      self.gae = subprocess.Popen((os.path.realpath(options.localgae) + "/dev_appserver.py", 
+        os.path.dirname(os.path.realpath(__file__))))     
+    
     for attrib in 'verbose host port prefix'.split():
       setattr(self, attrib, getattr(options, attrib))
     # ensure prefix starts and doesn't end with / (or, is /)
@@ -99,11 +110,12 @@ class Tester(object):
     return dict((c.name, c.value) for c in self.cj)
 
   def execute(self):
+    if self.gae: time.sleep(3)   # wait for GAE server to start
     try:
       self.conn = httplib.HTTPConnection(self.host, self.port, strict=True)
     except socket.error, e:
       print "Cannot connect: %s"
       sys.exit(1)
     self.f(self, self.verbose)
+    if self.gae: os.kill(self.gae.pid, signal.SIGTERM) 
     print 'All done OK!'
-
