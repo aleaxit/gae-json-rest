@@ -1,17 +1,17 @@
 # common needs of JSON-REST-based client-side Python tests
 # (intended to be run while gae-json-rest is being served at localhost:8080)!
-import os
+import cookielib
 import httplib
 import optparse
-import socket
-import sys
-import cookielib
-import urllib2
-import subprocess
-import time
+import os
 import signal
-
+import socket
+import subprocess
+import sys
+import time
+import urllib2
 import simplejson
+
 
 DEFAULT_HOST = 'localhost'
 DEFAULT_PORT = 8080
@@ -38,7 +38,7 @@ class Tester(object):
                       type="int", help="what port the server is running on")
     parser.add_option("-x", "--prefix", dest="prefix", default=DEFAULT_PREFIX,
                       help="prefix to prepend to every path to test")
-    parser.add_option("-l", "--local-gae", action="store", dest="localgae",
+    parser.add_option("-l", "--local-gae", action="store", dest="gaepath",
                       help="GAE SDK directory path")
 
     options, args = parser.parse_args()
@@ -46,12 +46,15 @@ class Tester(object):
       print 'Unknown arguments:', args
       sys.exit(1)
 
-    if options.localgae: # start the local GAE server
-      self.gae = subprocess.Popen((os.path.realpath(options.localgae) + "/dev_appserver.py", 
-        os.path.dirname(os.path.realpath(__file__))))     
-    
     for attrib in 'verbose host port prefix'.split():
       setattr(self, attrib, getattr(options, attrib))
+    
+
+    if options.gaepath: # start the local GAE server
+      self.gae = subprocess.Popen((os.path.realpath(options.gaepath) + 
+        "/dev_appserver.py " + "-p %d " % self.port + "-a %s" % self.host, 
+        os.path.dirname(os.path.realpath(__file__))))     
+    
     # ensure prefix starts and doesn't end with / (or, is /)
     self.prefix = self.prefix.strip('/')
     if self.prefix: self.prefix = '/%s/' % self.prefix
@@ -110,12 +113,12 @@ class Tester(object):
     return dict((c.name, c.value) for c in self.cj)
 
   def execute(self):
-    if self.gae: time.sleep(3)   # wait for GAE server to start
+    if self.gae is not None: time.sleep(3)   # wait for GAE server to start
     try:
       self.conn = httplib.HTTPConnection(self.host, self.port, strict=True)
     except socket.error, e:
       print "Cannot connect: %s"
       sys.exit(1)
     self.f(self, self.verbose)
-    if self.gae: os.kill(self.gae.pid, signal.SIGTERM) 
+    if self.gae is not None: os.kill(self.gae.pid, signal.SIGINT) 
     print 'All done OK!'
