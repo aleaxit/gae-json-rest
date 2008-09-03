@@ -50,7 +50,7 @@ class Tester(object):
       setattr(self, attrib, getattr(options, attrib))
     
 
-    if options.gaepath: # start the local GAE server
+    if options.gaepath is not None: # start the local GAE server
       self.gae = subprocess.Popen((os.path.realpath(options.gaepath) + 
         "/dev_appserver.py " + "-p %d " % self.port + "-a %s" % self.host, 
         os.path.dirname(os.path.realpath(__file__))))     
