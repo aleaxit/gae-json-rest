@@ -194,7 +194,6 @@ def registerInstanceMethod(model, name, method):
 
 def instanceMethodByName(model, name):
   return _methodByName(model, name, '_im')
-  return mm.get(name)
 
 def allInstanceMethods(model):
   return _allMethods(model, '_im')
