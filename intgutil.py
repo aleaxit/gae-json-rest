@@ -178,7 +178,7 @@ class JsonRestHelper(object):
     Side effects:
       sets response status to 400 if either model or method were not found
     """
-    return self._methodhelper(modelnamne, methodname, restutil.instanceMethodByName)
+    return self._methodhelper(modelname, methodname, restutil.instanceMethodByName)
 
 
   def do_delete(self, model, strid):
