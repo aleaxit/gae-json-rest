@@ -51,7 +51,7 @@ class JsonRestHelper(object):
     handler.post = self.post
     handler.delete = self.delete
     handler.jrh = self
-        
+
   def hookdown(self):
     """ Undoes the effects of self.hookup """
     logging.info('hookdn %r/%r', self, self.handler)
@@ -113,7 +113,7 @@ class JsonRestHelper(object):
     if entity is None:
       self.handler.response.set_status(404, "Entity %s/%s not found" %
                                              (modelname, strid))
-    return entity 
+    return entity
 
   def get_special_method(self, specialname, methodname):
     """ Gets a special object method (or None) given special & method names.
@@ -129,7 +129,7 @@ class JsonRestHelper(object):
     special = self.get_special(specialname)
     if special is None: return ''
     method = special.get(methodname)
-    if method is None: 
+    if method is None:
       self.handler.response.set_status(400, 'Method %r not found in special %r'
                                            % (methodname, specialname))
     return method
@@ -149,7 +149,7 @@ class JsonRestHelper(object):
     model = self.get_model(modelname)
     if model is None: return ''
     method = _getter(model, methodname)
-    if method is None: 
+    if method is None:
       self.handler.response.set_status(400, 'Method %r not found in model' %
                                              (methodname, modelname))
     return method
@@ -165,7 +165,7 @@ class JsonRestHelper(object):
     Side effects:
       sets response status to 400 if either model or method were not found
     """
-    return self._methodhelper(model, methodname, restutil.modelMethodByName)
+    return self._methodhelper(modelname, methodname, restutil.modelMethodByName)
 
   def get_instance_method(self, modelname, methodname):
     """ Gets an instance method given model and method names.
@@ -178,7 +178,7 @@ class JsonRestHelper(object):
     Side effects:
       sets response status to 400 if either model or method were not found
     """
-    return self._methodhelper(model, methodname, restutil.instanceMethodByName)
+    return self._methodhelper(modelnamne, methodname, restutil.instanceMethodByName)
 
 
   def do_delete(self, model, strid):
