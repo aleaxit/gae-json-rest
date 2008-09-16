@@ -17,6 +17,7 @@ The mixin class supplies methods to get_, set_, delete_ and unset_ a cookie
 import Cookie
 import datetime
 import time
+from Cookie import BaseCookie
 
 
 def _serialize_cookie_date(dt):
@@ -95,7 +96,7 @@ class CookieMixin(object):
       adds to self.response.headers an appropriate Set-Cookie header.
     """
     self.set_cookie(key, '', path=path, domain=domain,
-                    max_age=0, expires=timedelta(days=-5))
+                    max_age=0, expires=datetime.timedelta(days=-5))
 
   def unset_cookie(self, key):
     """ Unset a cookie with the given name (remove from the response).
