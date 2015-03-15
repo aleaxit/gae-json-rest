@@ -1,0 +1,3 @@
+gae-json-rest let you use REST (Representative State Transfer) to access your data. POST creates a new object and returns it with the server-generated id, PUT updates an existing object, DELETE removes it, and GET either returns an array of objects (optionally using a query) or the specific object.
+
+For example;  GET /doctor/1  will return the doctor object with id '1' as a json string, perhaps; {'id': '1', 'name': 'Gray'}
